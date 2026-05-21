@@ -75,7 +75,10 @@ fun AddEditTransactionScreen(
     LaunchedEffect(existing) {
         if (existing != null && !formInitialized) {
             type               = existing.type
-            amount             = existing.amount.toString()
+            // strip trailing .0 so the field shows "10" not "10.0"
+            amount             = existing.amount.let {
+                if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
+            }
             description        = existing.description
             selectedCategoryId = existing.categoryId
             selectedAccountId  = existing.accountId
@@ -132,7 +135,7 @@ fun AddEditTransactionScreen(
                 .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
                 .verticalScroll(rememberScrollState())
         ) {
-            // ── Header ────────────────────────────────────────────
+            // ── Header ─────────────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -237,13 +240,10 @@ fun AddEditTransactionScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
-                // Display row — plain Texts, trivially centred
                 Row(
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { amountFocusRequester.requestFocus() }
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         "€",
@@ -252,34 +252,45 @@ fun AddEditTransactionScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp, end = 4.dp)
                     )
-                    Text(
-                        if (amount.isEmpty()) "0" else amount,
-                        fontSize = 64.sp,
-                        fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.Normal,
-                        letterSpacing = (-1).sp,
-                        color = if (amount.isEmpty())
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        else MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 64.sp
+                    BasicTextField(
+                        value = amount,
+                        onValueChange = { v -> if (v.matches(Regex("[0-9]*\\.?[0-9]*"))) amount = v },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                        textStyle = TextStyle(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 64.sp,
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Normal,
+                            letterSpacing = (-1).sp,
+                            lineHeight = 64.sp
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (amount.isEmpty()) {
+                                    Text(
+                                        "0",
+                                        fontSize = 64.sp,
+                                        fontFamily = FontFamily.Serif,
+                                        fontWeight = FontWeight.Normal,
+                                        letterSpacing = (-1).sp,
+                                        lineHeight = 64.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        },
+                        modifier = Modifier
+                            .focusRequester(amountFocusRequester)
+                            .defaultMinSize(minWidth = 48.dp)
                     )
                 }
-                // Hidden 1×1dp field that owns keyboard input
-                BasicTextField(
-                    value = amount,
-                    onValueChange = { v -> if (v.matches(Regex("[0-9]*\\.?[0-9]*"))) amount = v },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    textStyle = TextStyle(color = Color.Transparent, fontSize = 1.sp),
-                    cursorBrush = SolidColor(Color.Transparent),
-                    modifier = Modifier
-                        .size(1.dp)
-                        .focusRequester(amountFocusRequester)
-                )
                 Spacer(Modifier.height(16.dp))
                 // Quick-add chips
                 Row(
@@ -296,6 +307,7 @@ fun AddEditTransactionScreen(
                                     if (it == it.toLong().toDouble()) it.toLong().toString()
                                     else it.toString()
                                 }
+                                amountFocusRequester.requestFocus()
                             },
                             shape = RoundedCornerShape(100.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),

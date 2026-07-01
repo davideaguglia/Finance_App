@@ -6,9 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.financeapp.ui.components.BarChart
 import com.personal.financeapp.ui.components.DonutChart
 import com.personal.financeapp.ui.components.LineChart
+import com.personal.financeapp.ui.components.MonthSelector
 import com.personal.financeapp.ui.components.MonthlyBarData
 import com.personal.financeapp.ui.theme.ExpenseRed
 import com.personal.financeapp.ui.theme.IncomeGreen
@@ -58,7 +56,13 @@ fun ReportsScreen(
             }
         }
         item { NetWorthHeroCard(state.netWorthHistory.lastOrNull()?.netWorth ?: 0.0) }
-        item { MonthSelector(state, onMonthChange = { m, y -> viewModel.selectMonth(m, y) }) }
+        item {
+            MonthSelector(
+                selectedMonth = state.selectedMonth,
+                selectedYear = state.selectedYear,
+                onMonthChange = { m, y -> viewModel.selectMonth(m, y) }
+            )
+        }
         if (state.categoryBreakdown.isNotEmpty()) {
             item { CategoryBreakdownCard(state) }
         } else {
@@ -100,60 +104,6 @@ private fun NetWorthHeroCard(netWorth: Double) {
                 style = MaterialTheme.typography.displayMedium,
                 color = if (netWorth >= 0) IncomeGreen else Terra
             )
-        }
-    }
-}
-
-@Composable
-private fun MonthSelector(state: ReportsUiState, onMonthChange: (Int, Int) -> Unit) {
-    val monthNames = remember {
-        SimpleDateFormat("MMMM yyyy", Locale.getDefault())
-    }
-    val cal = remember(state.selectedMonth, state.selectedYear) {
-        Calendar.getInstance().apply { set(state.selectedYear, state.selectedMonth, 1) }
-    }
-    val label = monthNames.format(cal.time)
-
-    // Prevent selecting future months
-    val now = Calendar.getInstance()
-    val isCurrentOrFuture = state.selectedYear > now.get(Calendar.YEAR) ||
-        (state.selectedYear == now.get(Calendar.YEAR) && state.selectedMonth >= now.get(Calendar.MONTH))
-
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(onClick = {
-                val prev = Calendar.getInstance().apply { set(state.selectedYear, state.selectedMonth, 1) }
-                prev.add(Calendar.MONTH, -1)
-                onMonthChange(prev.get(Calendar.MONTH), prev.get(Calendar.YEAR))
-            }) {
-                Icon(Icons.Default.ChevronLeft, contentDescription = "Previous month")
-            }
-
-            Text(
-                label,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            IconButton(
-                onClick = {
-                    val next = Calendar.getInstance().apply { set(state.selectedYear, state.selectedMonth, 1) }
-                    next.add(Calendar.MONTH, 1)
-                    onMonthChange(next.get(Calendar.MONTH), next.get(Calendar.YEAR))
-                },
-                enabled = !isCurrentOrFuture
-            ) {
-                Icon(Icons.Default.ChevronRight, contentDescription = "Next month")
-            }
         }
     }
 }

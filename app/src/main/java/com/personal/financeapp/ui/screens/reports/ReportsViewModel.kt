@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.personal.financeapp.data.local.entity.CategoryEntity
 import com.personal.financeapp.data.local.entity.NetWorthSnapshotEntity
 import com.personal.financeapp.data.repository.*
+import com.personal.financeapp.util.MonthRange
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,8 +19,8 @@ data class ReportsUiState(
     val monthlyData: List<MonthlyData> = emptyList(),
     val categoryBreakdown: List<CategoryBreakdown> = emptyList(),
     val netWorthHistory: List<NetWorthSnapshotEntity> = emptyList(),
-    val selectedMonth: Int = Calendar.getInstance().get(Calendar.MONTH),
-    val selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR)
+    val selectedMonth: Int = MonthRange.currentMonth(),
+    val selectedYear: Int = MonthRange.currentYear()
 )
 
 @HiltViewModel
@@ -31,8 +32,8 @@ class ReportsViewModel @Inject constructor(
     private val investmentRepo: InvestmentRepository
 ) : ViewModel() {
 
-    private val selectedMonth = MutableStateFlow(Calendar.getInstance().get(Calendar.MONTH))
-    private val selectedYear = MutableStateFlow(Calendar.getInstance().get(Calendar.YEAR))
+    private val selectedMonth = MutableStateFlow(MonthRange.currentMonth())
+    private val selectedYear = MutableStateFlow(MonthRange.currentYear())
 
     val uiState: StateFlow<ReportsUiState> = combine(
         netWorthRepo.getAll(),
@@ -45,13 +46,7 @@ class ReportsViewModel @Inject constructor(
         val monthlyData = buildMonthlyData(allTx, year, month)
 
         // Category breakdown for selected month
-        val cal = Calendar.getInstance()
-        cal.set(year, month, 1, 0, 0, 0)
-        val from = cal.timeInMillis
-        cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-        cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59)
-        val to = cal.timeInMillis
-
+        val (from, to) = MonthRange.monthRange(month, year)
         val monthTx = allTx.filter { it.transaction.date in from..to && it.transaction.type == "EXPENSE" }
         val catMap = categories.associateBy { it.id }
         val catSpend = monthTx.groupBy { it.transaction.categoryId }
@@ -103,10 +98,7 @@ class ReportsViewModel @Inject constructor(
             val c = Calendar.getInstance()
             c.set(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), 1, 0, 0, 0)
             c.add(Calendar.MONTH, -i)
-            val from = c.timeInMillis
-            c.set(Calendar.DAY_OF_MONTH, c.getActualMaximum(Calendar.DAY_OF_MONTH))
-            c.set(Calendar.HOUR_OF_DAY, 23); c.set(Calendar.MINUTE, 59)
-            val to = c.timeInMillis
+            val (from, to) = MonthRange.monthRange(c.get(Calendar.MONTH), c.get(Calendar.YEAR))
             val label = "${c.get(Calendar.MONTH) + 1}/${c.get(Calendar.YEAR) % 100}"
             val income = allTx.filter { it.transaction.date in from..to && it.transaction.type == "INCOME" }
                 .sumOf { it.transaction.amount }

@@ -21,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.financeapp.data.local.dao.TransactionWithDetails
 import com.personal.financeapp.ui.components.DonutChart
+import com.personal.financeapp.ui.components.MonthSelector
 import com.personal.financeapp.ui.theme.Forest
 import com.personal.financeapp.ui.theme.IncomeGreen
 import com.personal.financeapp.ui.theme.Terra
@@ -61,13 +62,13 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 88.dp),
         ) {
-            // ── Editorial header ─────────────────────────────────
+            // ── Editorial header ──────────────────────────────────
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.background)
-                        .padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 16.dp),
+                        .padding(start = 20.dp, end = 8.dp, top = 4.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Bottom
                 ) {
@@ -90,13 +91,24 @@ fun DashboardScreen(
                 }
             }
 
-            // ── Monthly balance hero ─────────────────────────────
+            // ── Month navigator ──────────────────────────────────
+            item {
+                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
+                    MonthSelector(
+                        selectedMonth = state.selectedMonth,
+                        selectedYear = state.selectedYear,
+                        onMonthChange = { m, y -> viewModel.selectMonth(m, y) }
+                    )
+                }
+            }
+
+            // ── Monthly balance hero ───────────────────────────────
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     AtelierCard {
                         Column(modifier = Modifier.padding(20.dp)) {
                             Text(
-                                "NET FLOW · THIS MONTH",
+                                "NET FLOW",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -111,13 +123,12 @@ fun DashboardScreen(
                 }
             }
 
-            // ── Earned / Spent side-by-side ──────────────────────
+            // ── Earned / Spent side-by-side ──────────────────────────
             item {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Earned card
                     OutlinedCard(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
@@ -139,7 +150,6 @@ fun DashboardScreen(
                             )
                         }
                     }
-                    // Spent card
                     OutlinedCard(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp),
@@ -164,7 +174,7 @@ fun DashboardScreen(
                 }
             }
 
-            // ── Spending breakdown ───────────────────────────────
+            // ── Spending breakdown ───────────────────────────────────
             if (state.categoryExpenses.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(12.dp))
@@ -174,7 +184,7 @@ fun DashboardScreen(
                 }
             }
 
-            // ── Recent activity ──────────────────────────────────
+            // ── Recent activity ─────────────────────────────────────
             if (state.recentTransactions.isNotEmpty()) {
                 item {
                     Row(

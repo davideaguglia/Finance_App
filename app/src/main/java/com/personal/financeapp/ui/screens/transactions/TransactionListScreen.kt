@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.personal.financeapp.data.local.dao.TransactionWithDetails
+import com.personal.financeapp.ui.components.MonthSelector
 import com.personal.financeapp.ui.theme.Forest
 import com.personal.financeapp.ui.theme.IncomeGreen
 import com.personal.financeapp.ui.theme.Terra
@@ -70,7 +71,7 @@ fun TransactionListScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 88.dp)
         ) {
-            // ── Header ────────────────────────────────────────────
+            // ── Header ─────────────────────────────────────────────
             item {
                 if (isSelecting) {
                     Row(
@@ -136,7 +137,20 @@ fun TransactionListScreen(
                 }
             }
 
-            // ── Search field ──────────────────────────────────────
+            // ── Month navigator ──────────────────────────────────
+            if (!isSelecting) {
+                item {
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        MonthSelector(
+                            selectedMonth = state.selectedMonth,
+                            selectedYear = state.selectedYear,
+                            onMonthChange = { m, y -> viewModel.selectMonth(m, y) }
+                        )
+                    }
+                }
+            }
+
+            // ── Search field ───────────────────────────────────────
             item {
                 AnimatedVisibility(searchVisible && !isSelecting) {
                     OutlinedTextField(
@@ -145,7 +159,7 @@ fun TransactionListScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp),
-                        placeholder = { Text("Search transactions…") },
+                        placeholder = { Text("Search transactions in this month…") },
                         singleLine = true,
                         shape = RoundedCornerShape(100.dp),
                         leadingIcon = { Icon(Icons.Default.Search, null, modifier = Modifier.size(18.dp)) },
@@ -160,13 +174,13 @@ fun TransactionListScreen(
                 }
             }
 
-            // ── Filter pills ──────────────────────────────────────
+            // ── Filter pills ───────────────────────────────────────
             item {
                 AnimatedVisibility(!isSelecting) {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
                     ) {
                         val filters = listOf(null to "All", "INCOME" to "Income", "EXPENSE" to "Expenses")
                         items(filters) { (type, label) ->
@@ -185,7 +199,7 @@ fun TransactionListScreen(
                 }
             }
 
-            // ── Net flow summary strip ────────────────────────────
+            // ── Net flow summary strip ────────────────────────────────
             if (state.transactions.isNotEmpty() && !isSelecting) {
                 item {
                     val income = state.transactions.filter { it.transaction.type == "INCOME" }
@@ -193,9 +207,9 @@ fun TransactionListScreen(
                     val expense = state.transactions.filter { it.transaction.type == "EXPENSE" }
                         .sumOf { it.transaction.amount }
                     val net = income - expense
-                    val monthLabel = remember {
-                        java.text.SimpleDateFormat("MMMM", java.util.Locale.getDefault())
-                            .format(java.util.Date())
+                    val monthLabel = remember(state.selectedMonth, state.selectedYear) {
+                        val cal = Calendar.getInstance().apply { set(state.selectedYear, state.selectedMonth, 1) }
+                        SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)
                     }
                     OutlinedCard(
                         modifier = Modifier
@@ -241,11 +255,18 @@ fun TransactionListScreen(
 
             if (state.transactions.isEmpty()) {
                 item {
+                    val emptyMonthLabel = remember(state.selectedMonth, state.selectedYear) {
+                        val cal = Calendar.getInstance().apply { set(state.selectedYear, state.selectedMonth, 1) }
+                        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(cal.time)
+                    }
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(top = 64.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 64.dp, start = 24.dp, end = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No transactions yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "No transactions in $emptyMonthLabel",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             } else {

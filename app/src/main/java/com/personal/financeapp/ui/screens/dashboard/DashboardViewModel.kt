@@ -5,9 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.personal.financeapp.data.local.dao.TransactionWithDetails
 import com.personal.financeapp.data.local.entity.CategoryEntity
 import com.personal.financeapp.data.repository.*
+import com.personal.financeapp.util.MonthRange
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import java.util.Calendar
 import javax.inject.Inject
 
 data class CategoryExpense(val category: CategoryEntity, val amount: Double)
@@ -17,9 +18,12 @@ data class DashboardUiState(
     val monthlyExpense: Double = 0.0,
     val netWorth: Double = 0.0,
     val recentTransactions: List<TransactionWithDetails> = emptyList(),
-    val categoryExpenses: List<CategoryExpense> = emptyList()
+    val categoryExpenses: List<CategoryExpense> = emptyList(),
+    val selectedMonth: Int = MonthRange.currentMonth(),
+    val selectedYear: Int = MonthRange.currentYear()
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val transactionRepo: TransactionRepository,
@@ -28,47 +32,49 @@ class DashboardViewModel @Inject constructor(
     private val categoryRepo: CategoryRepository
 ) : ViewModel() {
 
-    private val monthRange: Pair<Long, Long>
-        get() {
-            val cal = Calendar.getInstance()
-            cal.set(Calendar.DAY_OF_MONTH, 1)
-            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0)
-            val from = cal.timeInMillis
-            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-            cal.set(Calendar.HOUR_OF_DAY, 23); cal.set(Calendar.MINUTE, 59); cal.set(Calendar.SECOND, 59)
-            return from to cal.timeInMillis
-        }
+    private val selectedMonth = MutableStateFlow(MonthRange.currentMonth())
+    private val selectedYear = MutableStateFlow(MonthRange.currentYear())
 
-    val uiState: StateFlow<DashboardUiState> = combine(
-        combine(
-            transactionRepo.getSumByType("INCOME", monthRange.first, monthRange.second),
-            transactionRepo.getSumByType("EXPENSE", monthRange.first, monthRange.second),
-            transactionRepo.getRecent(5)
-        ) { income, expense, recent -> Triple(income, expense, recent) },
-        combine(
-            transactionRepo.getCategoryTotals(monthRange.first, monthRange.second),
-            categoryRepo.getAll()
-        ) { totals, categories -> totals to categories }
-    ) { (income, expense, recent), (catTotals, categories) ->
-        val catMap = categories.associateBy { it.id }
-        val catExpenses = catTotals.mapNotNull { ct ->
-            catMap[ct.categoryId]?.let { CategoryExpense(it, ct.total) }
-        }.sortedByDescending { it.amount }
-        DashboardUiState(
-            monthlyIncome = income,
-            monthlyExpense = expense,
-            netWorth = 0.0,
-            recentTransactions = recent,
-            categoryExpenses = catExpenses
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
+    fun selectMonth(month: Int, year: Int) {
+        selectedMonth.value = month
+        selectedYear.value = year
+    }
+
+    private data class MonthSel(val month: Int, val year: Int)
+
+    val uiState: StateFlow<DashboardUiState> =
+        combine(selectedMonth, selectedYear) { m, y -> MonthSel(m, y) }
+            .flatMapLatest { sel ->
+                val (from, to) = MonthRange.monthRange(sel.month, sel.year)
+                combine(
+                    transactionRepo.getSumByType("INCOME", from, to),
+                    transactionRepo.getSumByType("EXPENSE", from, to),
+                    transactionRepo.getByDateRange(from, to),
+                    transactionRepo.getCategoryTotals(from, to),
+                    categoryRepo.getAll()
+                ) { income, expense, monthTx, catTotals, categories ->
+                    val catMap = categories.associateBy { it.id }
+                    val catExpenses = catTotals.mapNotNull { ct ->
+                        catMap[ct.categoryId]?.let { CategoryExpense(it, ct.total) }
+                    }.sortedByDescending { it.amount }
+                    DashboardUiState(
+                        monthlyIncome = income,
+                        monthlyExpense = expense,
+                        netWorth = 0.0,
+                        recentTransactions = monthTx.take(5),
+                        categoryExpenses = catExpenses,
+                        selectedMonth = sel.month,
+                        selectedYear = sel.year
+                    )
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
 
     // Net worth is derived separately to avoid the combine limit
     val netWorth: StateFlow<Double> = combine(
         accountRepo.getAll(),
         investmentRepo.getTotalPortfolioValue()
     ) { accounts, portfolioValue ->
-        // For each account we need to fetch net tx sum - approximate here with flow combination
         portfolioValue // accounts balance added in the screen via repository
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 }
